@@ -1,0 +1,11 @@
+app_name,business_function,has_ssn,has_financial,has_cpni,record_count,data_amount_gb,oldest_record_age_days,retention_policy_days
+Salesforce CRM,consumer,true,false,false,4500000,850,2920,1825
+Payment Gateway,backend,true,true,false,8200000,3200,1460,365
+Customer Mobile App,consumer,false,false,true,1200000,420,730,730
+Marketing Analytics Platform,marketing,false,false,false,6000000,1100,1095,365
+Internal HR System,internal,true,false,false,85000,45,3650,2190
+Employee Expense Tool,internal,false,true,false,320000,22,900,1095
+Data Warehouse,backend,true,true,true,9500000,8700,5475,1825
+Email Campaign Manager,marketing,false,false,false,2100000,310,730,365
+Customer Support Portal,consumer,false,false,false,540000,95,1825,1095
+IT Asset Registry,internal,false,false,false,12000,3,1460,2190

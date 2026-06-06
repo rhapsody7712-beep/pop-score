@@ -1,0 +1,135 @@
+# Privacy Onboarding Priority (POP) Score — configuration
+#
+# ── How to tune without redeployment ────────────────────────────────────────
+# • Change a weight:            edit the weight field on any factor.
+# • Add a new business type:    add a key under lookup.values.
+# • Add a sensitivity flag:     add a key under max_flag.flags.
+# • Add a new factor:           add a new entry to the factors list.
+#   Supported types: lookup | log_scale | max_flag | ratio | linear_scale
+# • Disable a factor:           set enabled: false.
+# • Rename a CSV column:        change the column (or numerator_column) field.
+# • Adjust tier boundaries:     edit tiers section.
+#
+# Weights are normalised at runtime, so they don't have to sum exactly to 1.0
+# (though they should, for clarity). A validation warning is logged if they
+# deviate by more than 0.01.
+# ────────────────────────────────────────────────────────────────────────────
+
+factors:
+
+  - id: business_function
+    label: "Business Function"
+    enabled: true
+    weight: 0.25
+    type: lookup
+    column: business_function        # CSV column name
+    lookup:
+      values:
+        consumer:   100
+        marketing:  100
+        internal:    40
+        backend:     20
+      default: 20                    # score for unrecognised values (conservative)
+
+  - id: data_sensitivity
+    label: "Data Sensitivity"
+    enabled: true
+    weight: 0.25
+    type: max_flag                   # score = MAX of all present flags
+    flags:                           # column_name: score
+      has_ssn:       100             # Social Security Numbers  (CCPA, state breach laws)
+      has_financial:  85             # Financial data           (PCI-DSS, GLBA)
+      has_cpni:       70             # Network/telecom data     (CPNI/TCPA)
+    default: 10                      # score when no flags are set
+
+  - id: data_volume
+    label: "Data Volume (records)"
+    enabled: true
+    weight: 0.20
+    type: log_scale
+    column: record_count
+    reference_max: 10000000          # 10 M records → score 100
+
+  - id: data_amount_gb
+    label: "Data Footprint (GB)"
+    enabled: true
+    weight: 0.15
+    type: log_scale
+    column: data_amount_gb
+    reference_max: 10000             # 10 TB → score 100
+
+  - id: retention_risk
+    label: "Retention Risk"
+    enabled: true
+    weight: 0.15
+    type: ratio                      # score = (numerator / denominator) × 100, capped at 100
+    numerator_column: oldest_record_age_days
+    denominator_column: retention_policy_days
+    no_denominator_score: 100        # score when denominator is 0 or missing (unknown = max risk)
+
+# ── Tier thresholds ───────────────────────────────────────────────────────────
+tiers:
+  critical:  80    # score >= 80 → Critical  (immediate onboarding)
+  high:      60    # score >= 60 → High
+  medium:    40    # score >= 40 → Medium
+                   # score <  40 → Exception
+
+# ── ServiceNow integration ────────────────────────────────────────────────────
+# Set mock_mode: true to run without a live ServiceNow instance (demo/dev).
+# Credentials MUST be set as environment variables — never hardcode them here.
+#
+#   export SN_USERNAME=your_sn_user
+#   export SN_PASSWORD=your_sn_password
+#
+servicenow:
+  instance:     "https://yourinstance.service-now.com"
+  username:     "${SN_USERNAME}"
+  password:     "${SN_PASSWORD}"
+  mock_mode:    true               # ← set false when connecting to real instance
+
+  cmdb_table:   "cmdb_ci_appl"    # application CI table
+  change_table: "change_request"  # change/deployment table
+  max_records:  1000
+  timeout_seconds: 30
+
+  # Map POP model field names → ServiceNow field names on your CI records.
+  # Change the right-hand values to match your ServiceNow instance schema.
+  field_mappings:
+    app_name:               "name"
+    business_function:      "u_business_function"   # custom field
+    has_ssn:                "u_has_ssn"
+    has_financial:          "u_has_financial"
+    has_cpni:               "u_has_cpni"
+    retention_policy_days:  "u_retention_policy_days"
+    db_connection_json:     "u_db_connection_json"  # JSON blob with DB connection info
+
+  # Write POP scores back to ServiceNow after each run
+  write_back:
+    enabled: false                 # ← set true to write results back to ServiceNow
+    table:   "u_pop_score_result"  # custom table to create in your SN instance
+
+# ── DB scanner ────────────────────────────────────────────────────────────────
+# Controls how the scanner connects to application databases to fetch metadata.
+# Per-app connection info (host, port, db name, credentials env vars) comes from
+# the CMDB CI record (u_db_connection_json field) or from the mock data.
+#
+# date_columns: tell the scanner which table+column to use to find the oldest
+# data subject record.  Configure per-environment as needed.
+#
+db_scanner:
+  timeout_seconds: 30
+
+  # Example date column configuration for real databases:
+  # date_columns:
+  #   - table: "users"
+  #     column: "created_at"
+  #   - table: "orders"
+  #     column: "order_date"
+  date_columns: []  # empty = oldest_record_age_days will be 0 (non-mock mode)
+
+# ── Monitor ───────────────────────────────────────────────────────────────────
+# Controls the monthly orchestration cycle.
+monitor:
+  lookback_days: 35         # re-scan apps with changes in the last N days
+  output_dir:   "."         # where to write CSV and JSON run summaries
+  log_level:    "info"      # info | debug
