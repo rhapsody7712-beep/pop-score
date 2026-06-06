@@ -1,26 +1,40 @@
-# pop-score — Privacy Onboarding Priority Scoring Engine
+# POP-Score — Privacy Onboarding Priority Scoring Engine
 
-pop-score helps privacy and compliance teams answer: **which enterprise applications should we onboard to DSR/privacy workflows first?**
-
-It scores each application across five configurable factors, produces an explainable 0–100 Signal Score, and outputs a ranked CSV and JSON audit file. Scoring is triggered monthly by a **ServiceNow Scheduled Job** that detects new deployments and database changes, initiates a live DB metadata scan, and writes results back to ServiceNow.
+**POP-Score answers one deceptively hard question for privacy and compliance teams: _which enterprise application should we onboard to DSR and privacy workflows first?_**
 
 ---
 
-## Quick start
+## The problem
 
-```bash
-pip install -r requirements.txt
+Large enterprises run thousands of applications, with personal data scattered across fragmented databases, data lakes, and warehouses. New data platforms, AI agents, and integrations spin up almost daily — each one a fresh source of compliance risk. No team can onboard everything at once, so the recurring question is always the same: *what do we tackle first?*
 
-# Score from a static CSV (ad-hoc / offline)
-python -m pop.cli score apps.csv --output results.csv
+Most organizations answer this subjectively. Prioritization comes down to tribal knowledge, the loudest stakeholder, or whoever's most recently been audited. The result is inconsistent, hard to explain, and impossible to defend when a regulator or internal auditor asks *"why this app and not that one?"*
 
-# Run a full monthly monitor cycle (mock mode — no real ServiceNow needed)
-python -m pop.cli monitor --force-all
-```
+POP-Score replaces that guesswork with a systematic, data-driven methodology. Every application is scored on the factors that genuinely drive compliance risk — what kind of data it holds, how much, how sensitive it is, and how long it's been retained. It's a **risk-based score: the higher the risk, the higher the priority.**
+
+The model is grounded in established privacy regulation — GDPR, CCPA, and the EU AI Act — and reflects Privacy by Design principles: data minimization, retention limits, Records of Processing Activities (RoPA), data inventory, sensitive-data identification, and financial/fraud-detection checks. The output is a transparent, auditable ranking that compliance teams can stand behind.
 
 ---
 
-## How it works
+## The systems-thinking shift
+
+The deeper idea behind POP-Score is that **prioritization should be a property of the system, not a recurring manual exercise.**
+
+Traditional privacy onboarding treats every audit and every prioritization decision as an isolated event — a fire drill where teams scramble to reconstruct a defensible narrative after the fact. POP-Score inverts that. It builds prioritization into the operating fabric: a scheduled job continuously detects new and changed applications, scans their data, scores them against consistent criteria, and writes the result back into the system of record.
+
+Three principles drive the design:
+
+1. **The score is explainable, not a black box.** Every composite score decomposes into its factors and weighted contributions, so any stakeholder can trace *exactly* why an app landed where it did.
+2. **Policy is configuration, not code.** Weights, thresholds, sensitivity flags, and tier boundaries all live in `config.yaml`. When legal guidance changes, you edit a value — you don't redeploy.
+3. **Detection is continuous, not periodic.** The system watches for change and rescans only what moved, so prioritization stays current without re-scanning the entire estate every cycle.
+
+This is the difference between *running an audit* and *operating an audit-ready system.*
+
+---
+
+## How the pieces fit together
+
+POP-Score scores each application across five configurable factors, produces an explainable 0–100 composite score, and outputs a ranked CSV plus a JSON audit file. The full cycle is triggered monthly by a **ServiceNow Scheduled Job** that detects new deployments and database changes, runs a live DB metadata scan, scores the results, and writes them back to ServiceNow.
 
 ```
 ServiceNow Scheduled Job (monthly)
@@ -49,6 +63,20 @@ python -m pop.cli monitor
 
 ---
 
+## Quick start
+
+```bash
+pip install -r requirements.txt
+
+# Score from a static CSV (ad-hoc / offline)
+python -m pop.cli score apps.csv --output results.csv
+
+# Run a full monthly monitor cycle (mock mode — no real ServiceNow needed)
+python -m pop.cli monitor --force-all
+```
+
+---
+
 ## The scoring model
 
 ### Composite score
@@ -67,6 +95,25 @@ Each factor is normalised to **0–100** before weighting. The composite is also
 | 60–79 | **High** | Next sprint |
 | 40–59 | **Medium** | Backlog — scheduled |
 | < 40 | **Exception** | Deprioritised / document rationale |
+
+The **Exception** tier is a deliberate governance control, not just a low score. Anything that lands here should carry a documented, signed-off rationale for *why* it was deprioritised — so the decision is auditable rather than silent.
+
+---
+
+## Worked example
+
+To see the model end-to-end, take **Salesforce CRM**, a consumer-facing app holding SSNs, ~8M records, ~2TB of data, with its oldest record sitting right at the retention boundary.
+
+| Factor | Raw input | Raw score | Weight | Weighted |
+|--------|-----------|-----------|--------|----------|
+| `business_function` | `consumer` | 100.0 | 0.25 | 25.0 |
+| `data_sensitivity` | `has_ssn = true` | 100.0 | 0.25 | 25.0 |
+| `data_volume` | 8,000,000 records | 90.3 | 0.20 | 18.1 |
+| `data_amount_gb` | 2,048 GB | 76.3 | 0.15 | 11.4 |
+| `retention_risk` | at policy boundary | 100.0 | 0.15 | 15.0 |
+| **Composite** | | | | **94.5 → Critical** |
+
+A reader can trace every point of that 94.5 back to a real, sourced input — which is exactly what an auditor wants to see.
 
 ---
 
@@ -123,6 +170,10 @@ score = min( oldest_record_age_days / retention_policy_days × 100, 100 )
 At or past policy boundary → 100. No defined policy → 100 (unknown = maximum risk).
 
 **Why 0.15?** Retention overruns create direct GDPR Art. 5(1)(e) and CCPA risk.
+
+### A note on the weights
+
+The two highest-leverage factors — business function and data sensitivity — carry the most weight (0.25 each) because together they define the *regulatory surface*: who the data subjects are and how exposed their data is. Volume and the two newer factors (storage footprint and retention drift) are amplifiers — they make an already-risky app riskier, but they don't create obligation on their own. Hence 0.20 and 0.15. Because every weight is configurable, these are starting positions a privacy office can tune to its own risk appetite, not fixed law.
 
 ---
 
@@ -309,13 +360,33 @@ Every monitor run produces two files named `pop-run-YYYYMMDD-HHMMSS.*`:
       "tier": "Critical",
       "factors": {
         "business_function": { "raw": 100.0, "weighted": 25.0 },
-        "data_sensitivity":  { "raw": 100.0, "weighted": 25.0 },
-        ...
+        "data_sensitivity":  { "raw": 100.0, "weighted": 25.0 }
       }
     }
   ]
 }
 ```
+
+---
+
+## Limitations and assumptions
+
+POP-Score is a prioritization aid, not a compliance determination. A few things worth being explicit about:
+
+- **Scoring quality depends on metadata accuracy.** The model is only as good as the `business_function`, sensitivity flags, and retention policies recorded in ServiceNow and the source databases. Garbage in, garbage out applies.
+- **Log-scaling is a deliberate choice.** It prevents a single massive application from dominating the ranking purely on size. Teams that want size to dominate can switch to `linear_scale` in config.
+- **"Unknown = maximum risk"** for retention. An app with no defined retention policy scores 100 on that factor by design — absence of a policy is itself a finding.
+- **The weights are a starting position, not law.** They encode one reasonable risk philosophy; every privacy office should tune them to its own regulatory footprint and risk appetite.
+
+---
+
+## Roadmap
+
+- REST API endpoint for on-demand scoring outside the monthly cycle
+- Web dashboard for tier distribution, onboarding velocity, and unassessed-app aging
+- Native Collibra connector for data-catalog-driven sensitivity flags
+- Pluggable scoring for emerging AI/agent data platforms (EU AI Act alignment)
+- Historical score tracking to surface apps whose risk is *trending* up
 
 ---
 
