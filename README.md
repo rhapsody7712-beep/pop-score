@@ -6,13 +6,13 @@
 
 ## The problem
 
-Large enterprises run thousands of applications, with personal data scattered across fragmented databases, data lakes, and warehouses. New data platforms, AI agents, and integrations spin up almost daily — each one a fresh source of compliance risk. No team can onboard everything at once, so the recurring question is always the same: *what do we tackle first?*
+Large enterprises run thousands of applications, with personal data scattered across fragmented databases, data lakes, and warehouses. New data platforms, AI agents, and integrations spin up almost daily - each one a fresh source of compliance risk. No team can onboard everything at once, so the recurring question is always the same: *what do we tackle first?*
 
 Most organizations answer this subjectively. Prioritization comes down to tribal knowledge, the loudest stakeholder, or whoever's most recently been audited. The result is inconsistent, hard to explain, and impossible to defend when a regulator or internal auditor asks *"why this app and not that one?"*
 
 POP-Score replaces that guesswork with a systematic, data-driven methodology. Every application is scored on the factors that genuinely drive compliance risk — what kind of data it holds, how much, how sensitive it is, and how long it's been retained. It's a **risk-based score: the higher the risk, the higher the priority.**
 
-The model is grounded in established privacy regulation — GDPR, CCPA, and the EU AI Act — and reflects Privacy by Design principles: data minimization, retention limits, Records of Processing Activities (RoPA), data inventory, sensitive-data identification, and financial/fraud-detection checks. The output is a transparent, auditable ranking that compliance teams can stand behind.
+The model is grounded in established privacy regulation - GDPR, CCPA, and the EU AI Act and reflects Privacy by Design principles: data minimization, retention limits, Records of Processing Activities (RoPA), data inventory, sensitive-data identification, and financial/fraud-detection checks. The output is a transparent, auditable ranking that compliance teams can stand behind.
 
 ---
 
@@ -20,7 +20,7 @@ The model is grounded in established privacy regulation — GDPR, CCPA, and the 
 
 The deeper idea behind POP-Score is that **prioritization should be a property of the system, not a recurring manual exercise.**
 
-Traditional privacy onboarding treats every audit and every prioritization decision as an isolated event — a fire drill where teams scramble to reconstruct a defensible narrative after the fact. POP-Score inverts that. It builds prioritization into the operating fabric: a scheduled job continuously detects new and changed applications, scans their data, scores them against consistent criteria, and writes the result back into the system of record.
+Traditional privacy onboarding treats every audit and every prioritization decision as an isolated event a fire drill where teams scramble to reconstruct a defensible narrative after the fact. POP-Score inverts that. It builds prioritization into the operating fabric: a scheduled job continuously detects new and changed applications, scans their data, scores them against consistent criteria, and writes the result back into the system of record.
 
 Three principles drive the design:
 
